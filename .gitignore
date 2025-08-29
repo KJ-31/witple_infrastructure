@@ -1,0 +1,26 @@
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+.terraform.lock.hcl
+
+# 민감한 정보
+terraform.tfvars
+*.tfvars
+!terraform.tfvars.example
+
+# 로그 파일
+*.log
+
+# OS 파일
+.DS_Store
+Thumbs.db
+
+# IDE 파일
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# AWS 자격 증명 (로컬에서만 사용)
+.aws/
