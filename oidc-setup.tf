@@ -37,7 +37,7 @@ resource "aws_iam_role" "github_actions" {
             "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com"
           }
           StringLike = {
-            "token.actions.githubusercontent.com:sub" = "repo:${var.github_repository}:*"
+            "token.actions.githubusercontent.com:sub" = "repo:KJ-31/witple_backtend:*"
           }
         }
       }
@@ -101,7 +101,7 @@ resource "aws_iam_role_policy" "github_actions" {
 variable "github_repository" {
   description = "GitHub repository (format: owner/repo)"
   type        = string
-  default     = "JunPyo0117/test-git-cicd"  # 실제 GitHub 저장소
+  default     = "KJ-31/witple_backtend"  # 실제 GitHub 저장소
 }
 
 # Data sources

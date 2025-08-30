@@ -97,6 +97,14 @@ resource "aws_iam_user" "my_user" {
   }
 }
 
+# wnsvy 사용자를 위한 EKS Access Entry 추가
+resource "aws_eks_access_entry" "wnsvy" {
+  cluster_name      = module.eks.cluster_name
+  principal_arn     = "arn:aws:iam::737221504302:user/wnsvy"
+  kubernetes_groups = ["admin"]
+  type             = "STANDARD"
+}
+
 # IAM Access Key for my_user
 resource "aws_iam_access_key" "my_user" {
   user = aws_iam_user.my_user.name
@@ -207,6 +215,32 @@ resource "aws_eks_access_policy_association" "github_actions_cluster_admin" {
   depends_on = [aws_eks_access_entry.github_actions]
 }
 
+# Associate AmazonEKSAdminPolicy with wnsvy
+resource "aws_eks_access_policy_association" "wnsvy_admin" {
+  cluster_name  = module.eks.cluster_name
+  principal_arn = "arn:aws:iam::737221504302:user/wnsvy"
+  policy_arn    = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSAdminPolicy"
+  
+  access_scope {
+    type = "cluster"
+  }
+  
+  depends_on = [aws_eks_access_entry.wnsvy]
+}
+
+# Associate AmazonEKSClusterAdminPolicy with wnsvy
+resource "aws_eks_access_policy_association" "wnsvy_cluster_admin" {
+  cluster_name  = module.eks.cluster_name
+  principal_arn = "arn:aws:iam::737221504302:user/wnsvy"
+  policy_arn    = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
+  
+  access_scope {
+    type = "cluster"
+  }
+  
+  depends_on = [aws_eks_access_entry.wnsvy]
+}
+
 
 
 
@@ -215,6 +249,7 @@ resource "aws_eks_access_policy_association" "github_actions_cluster_admin" {
 resource "aws_ecr_repository" "frontend" {
   name                 = "witple-frontend"
   image_tag_mutability = "MUTABLE"
+  force_delete         = true
   
   image_scanning_configuration {
     scan_on_push = true
@@ -228,6 +263,7 @@ resource "aws_ecr_repository" "frontend" {
 resource "aws_ecr_repository" "backend" {
   name                 = "witple-backend"
   image_tag_mutability = "MUTABLE"
+  force_delete         = true
   
   image_scanning_configuration {
     scan_on_push = true
@@ -401,37 +437,113 @@ resource "aws_security_group" "alb" {
   }
 }
 
-# Security Group Rule: Allow ALB to access EKS cluster
+# Security Group Rule: Allow ALB to access EKS cluster (FastAPI)
 resource "aws_security_group_rule" "eks_from_alb" {
   type                     = "ingress"
-  from_port                = 3000
-  to_port                  = 3001
+  from_port                = 8000
+  to_port                  = 8000
   protocol                 = "tcp"
   source_security_group_id = aws_security_group.alb.id
   security_group_id        = module.eks.cluster_security_group_id
-  description              = "Allow ALB to access EKS cluster pods"
+  description              = "Allow ALB to access EKS cluster pods (FastAPI)"
 }
 
-# Security Group Rule: Allow ALB to access EKS node group
+# Security Group Rule: Allow ALB to access EKS node group (FastAPI)
 resource "aws_security_group_rule" "eks_node_from_alb" {
   type                     = "ingress"
-  from_port                = 3000
-  to_port                  = 3001
+  from_port                = 8000
+  to_port                  = 8000
   protocol                 = "tcp"
   source_security_group_id = aws_security_group.alb.id
   security_group_id        = module.eks.node_security_group_id
-  description              = "Allow ALB to access EKS node group"
+  description              = "Allow ALB to access EKS node group (FastAPI)"
 }
 
-# Security Group Rule: Allow pod CIDR access to EKS cluster
+# Security Group Rule: Allow pod CIDR access to EKS cluster (FastAPI)
 resource "aws_security_group_rule" "eks_from_pod_cidr" {
   type              = "ingress"
-  from_port         = 3000
-  to_port           = 3001
+  from_port         = 8000
+  to_port           = 8000
   protocol          = "tcp"
   cidr_blocks       = [var.pod_cidr]
   security_group_id = module.eks.cluster_security_group_id
-  description       = "Allow pod CIDR access to EKS cluster"
+  description       = "Allow pod CIDR access to EKS cluster (FastAPI)"
+}
+
+# Security Group for Redis (ElastiCache)
+resource "aws_security_group" "redis" {
+  name_prefix = "witple-redis-"
+  vpc_id      = module.vpc.vpc_id
+  
+  ingress {
+    from_port   = 6379
+    to_port     = 6379
+    protocol    = "tcp"
+    # EKS 클러스터에서 접근 허용
+    security_groups = [module.eks.cluster_security_group_id]
+    description     = "Allow EKS cluster to access Redis"
+  }
+  
+  ingress {
+    from_port   = 6379
+    to_port     = 6379
+    protocol    = "tcp"
+    # EKS 노드 그룹에서 접근 허용
+    security_groups = [module.eks.node_security_group_id]
+    description     = "Allow EKS node group to access Redis"
+  }
+  
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  
+  tags = {
+    Name = "witple-redis-sg"
+  }
+}
+
+# ElastiCache Subnet Group for Redis
+resource "aws_elasticache_subnet_group" "redis" {
+  name       = "witple-redis-subnet-group"
+  subnet_ids = module.vpc.private_subnets
+  
+  tags = {
+    Name = "witple-redis-subnet-group"
+  }
+}
+
+# ElastiCache Parameter Group for Redis
+resource "aws_elasticache_parameter_group" "redis" {
+  family = "redis7"
+  name   = "witple-redis-params"
+  
+  parameter {
+    name  = "maxmemory-policy"
+    value = "allkeys-lru"
+  }
+  
+  tags = {
+    Name = "witple-redis-params"
+  }
+}
+
+# ElastiCache Redis Cluster
+resource "aws_elasticache_cluster" "redis" {
+  cluster_id           = "witple-redis"
+  engine               = "redis"
+  node_type            = "cache.t3.micro"
+  num_cache_nodes      = 1
+  parameter_group_name = aws_elasticache_parameter_group.redis.name
+  port                 = 6379
+  subnet_group_name    = aws_elasticache_subnet_group.redis.name
+  security_group_ids   = [aws_security_group.redis.id]
+  
+  tags = {
+    Name = "witple-redis-cluster"
+  }
 }
 
 # Route 53 Hosted Zone (커스텀 도메인이 있는 경우)
@@ -440,7 +552,7 @@ resource "aws_route53_zone" "main" {
   name  = var.domain_name
   
   tags = {
-    Name = "cicd-zone"
+    Name = "witple-zone"
   }
 }
 
