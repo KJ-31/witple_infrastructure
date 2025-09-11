@@ -78,7 +78,7 @@ module "eks" {
       min_size     = 1
       max_size     = 2
       desired_size = 1
-      instance_types = ["t3.medium"]
+      instance_types = ["t3.large"]
       subnet_ids = module.vpc.private_subnets
       
       tags = {
@@ -312,6 +312,15 @@ resource "aws_security_group" "rds" {
     cidr_blocks = module.vpc.private_subnets_cidr_blocks
   }
   
+  # 특정 IP에서만 퍼블릭 액세스 허용 (개발용)
+  ingress {
+    from_port   = 5432
+    to_port     = 5432
+    protocol    = "tcp"
+    cidr_blocks = ["1.238.129.195/32"]
+    description = "Public access from specific IP for development"
+  }
+  
   egress {
     from_port   = 0
     to_port     = 0
@@ -341,6 +350,9 @@ resource "aws_db_instance" "main" {
   
   vpc_security_group_ids = [aws_security_group.rds.id]
   db_subnet_group_name   = aws_db_subnet_group.main.name
+  
+  # 퍼블릭 액세스 활성화 (개발용)
+  publicly_accessible = true
   
   backup_retention_period = 7
   backup_window          = "03:00-04:00"
@@ -468,6 +480,39 @@ resource "aws_security_group_rule" "eks_from_pod_cidr" {
   cidr_blocks       = [var.pod_cidr]
   security_group_id = module.eks.cluster_security_group_id
   description       = "Allow pod CIDR access to EKS cluster (FastAPI)"
+}
+
+# Security Group Rule: Allow ALB to access EKS cluster (Frontend - React)
+resource "aws_security_group_rule" "eks_from_alb_frontend" {
+  type                     = "ingress"
+  from_port                = 3000
+  to_port                  = 3000
+  protocol                 = "tcp"
+  source_security_group_id = aws_security_group.alb.id
+  security_group_id        = module.eks.cluster_security_group_id
+  description              = "Allow ALB to access EKS cluster pods (React Frontend)"
+}
+
+# Security Group Rule: Allow ALB to access EKS node group (Frontend - React)
+resource "aws_security_group_rule" "eks_node_from_alb_frontend" {
+  type                     = "ingress"
+  from_port                = 3000
+  to_port                  = 3000
+  protocol                 = "tcp"
+  source_security_group_id = aws_security_group.alb.id
+  security_group_id        = module.eks.node_security_group_id
+  description              = "Allow ALB to access EKS node group (React Frontend)"
+}
+
+# Security Group Rule: Allow pod CIDR access to EKS cluster (Frontend - React)
+resource "aws_security_group_rule" "eks_from_pod_cidr_frontend" {
+  type              = "ingress"
+  from_port         = 3000
+  to_port           = 3000
+  protocol          = "tcp"
+  cidr_blocks       = [var.pod_cidr]
+  security_group_id = module.eks.cluster_security_group_id
+  description       = "Allow pod CIDR access to EKS cluster (React Frontend)"
 }
 
 # Security Group for Redis (ElastiCache)
