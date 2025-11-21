@@ -37,7 +37,7 @@ resource "aws_iam_role" "github_actions" {
             "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com"
           }
           StringLike = {
-            "token.actions.githubusercontent.com:sub" = "repo:KJ-31/witple_backtend:*"
+            "token.actions.githubusercontent.com:sub" = "repo:${var.github_repository}:*"
           }
         }
       }
@@ -95,13 +95,6 @@ resource "aws_iam_role_policy" "github_actions" {
       # CloudFront를 사용하지 않으므로 불필요
     ]
   })
-}
-
-# Variables
-variable "github_repository" {
-  description = "GitHub repository (format: owner/repo)"
-  type        = string
-  default     = "KJ-31/witple_backtend"  # 실제 GitHub 저장소
 }
 
 # Data sources

@@ -95,7 +95,3 @@ witple_infrastructure/
 1. **S3 백엔드 접근 오류**: AWS 자격 증명 확인
 2. **EKS 클러스터 생성 실패**: VPC 설정 확인
 3. **GitHub Actions OIDC 오류**: 저장소 정보 확인
-
-## 📞 **지원**
-
-문제가 발생하면 GitHub Issues를 통해 문의해주세요.

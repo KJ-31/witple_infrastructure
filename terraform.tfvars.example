@@ -13,4 +13,4 @@ db_instance_class = "db.t3.micro"
 eks_node_instance_type = "t3.medium"
 
 # GitHub 저장소 설정 (실제 저장소로 변경 필요)
-github_repository = "your-username/your-repo"
+github_repository = "KJ-31/witple"

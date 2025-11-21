@@ -34,4 +34,8 @@ variable "pod_cidr" {
   default     = "10.0.1.0/24"
 }
 
-# GitHub repository variable is defined in oidc-setup.tf
+variable "github_repository" {
+  description = "GitHub repository for OIDC (format: owner/repo)"
+  type        = string
+  default     = "KJ-31/witple"
+}
